@@ -276,7 +276,7 @@ HTML = """<!DOCTYPE html>
 
 <div class="header">
   <div class="logo">Insta<span>Down</span></div>
-  <div class="subtitle">Termux Video Downloader &bull; localhost:69</div>
+  <div class="subtitle">Termux Video Downloader &bull; localhost:6969</div>
 </div>
 
 <div class="card">
@@ -602,8 +602,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print(f"\n📁 Save folder: {DOWNLOAD_DIR}")
-    print(f"🌐 Open browser: http://localhost:69")
+    print(f"🌐 Open browser: http://localhost:6969")
     print(f"\n   Ctrl+C দিয়ে বন্ধ করো\n")
     print("="*45 + "\n")
 
-    app.run(host="0.0.0.0", port=69, debug=False)
+    app.run(host="0.0.0.0", port=6969, debug=False)
