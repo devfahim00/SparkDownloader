@@ -25,8 +25,8 @@ def _pip_installed(pkg):
 
 
 def _bin_exists(binary):
-    result = subprocess.run(["which", binary], capture_output=True, text=True)
-    return result.returncode == 0
+    import shutil
+    return shutil.which(binary) is not None
 
 
 def check_and_setup():
@@ -679,8 +679,9 @@ def _run_download(dl_id: str, url: str, dl_type: str, quality: str):
         out_tmpl = os.path.join(DOWNLOAD_DIR, "%(title).80s.%(ext)s")
 
         # Resolve yt-dlp binary: try system PATH first, then pip-installed location
+        import shutil as _shutil
         ytdlp_bin = "yt-dlp"
-        if not _bin_exists("yt-dlp"):
+        if not _shutil.which("yt-dlp"):
             candidate = os.path.join(os.path.dirname(sys.executable), "yt-dlp")
             if os.path.exists(candidate):
                 ytdlp_bin = candidate
