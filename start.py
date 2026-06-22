@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-InstaDown - Social Media Downloader
-Termux Web Downloader | localhost:69
+SparkDownloader - Social Media Downloader
+Termux Web Downloader | localhost:6969
 Supports: Instagram, YouTube, TikTok, Facebook, Twitter/X and more
 """
 
 import os
 import sys
-import json
 import threading
 import subprocess
 from pathlib import Path
@@ -15,22 +14,19 @@ from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# Download folder - Termux shared storage
-DOWNLOAD_DIR = os.path.expanduser("~/storage/downloads/InstaDown")
+DOWNLOAD_DIR = os.path.expanduser("~/storage/downloads/SparkDownloader")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Track active downloads
 downloads = {}
 
 HTML = """<!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>InstaDown</title>
+<title>SparkDownloader</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   :root {
     --bg: #0a0a0f;
     --surface: #13131a;
@@ -45,7 +41,6 @@ HTML = """<!DOCTYPE html>
     --error: #ef4444;
     --warn: #f59e0b;
   }
-
   body {
     background: var(--bg);
     color: var(--text);
@@ -56,14 +51,9 @@ HTML = """<!DOCTYPE html>
     align-items: center;
     padding: 24px 16px;
   }
-
-  .header {
-    text-align: center;
-    margin-bottom: 32px;
-  }
-
+  .header { text-align: center; margin-bottom: 32px; }
   .logo {
-    font-size: 2.4rem;
+    font-size: 2.2rem;
     font-weight: 800;
     background: linear-gradient(135deg, #a855f7, #7c3aed, #6366f1);
     -webkit-background-clip: text;
@@ -71,18 +61,8 @@ HTML = """<!DOCTYPE html>
     background-clip: text;
     letter-spacing: -1px;
   }
-
-  .logo span {
-    font-weight: 300;
-    font-size: 1.6rem;
-  }
-
-  .subtitle {
-    color: var(--muted);
-    font-size: 0.85rem;
-    margin-top: 6px;
-  }
-
+  .logo span { font-weight: 300; }
+  .subtitle { color: var(--muted); font-size: 0.82rem; margin-top: 6px; }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -92,13 +72,7 @@ HTML = """<!DOCTYPE html>
     max-width: 520px;
     margin-bottom: 16px;
   }
-
-  .input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
+  .input-group { display: flex; flex-direction: column; gap: 12px; }
   .url-input {
     background: var(--surface);
     border: 1.5px solid var(--border);
@@ -110,19 +84,9 @@ HTML = """<!DOCTYPE html>
     transition: border-color 0.2s;
     outline: none;
   }
-
-  .url-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--glow);
-  }
-
+  .url-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
   .url-input::placeholder { color: var(--muted); }
-
-  .options-row {
-    display: flex;
-    gap: 10px;
-  }
-
+  .options-row { display: flex; gap: 10px; }
   .select-box {
     background: var(--surface);
     border: 1.5px solid var(--border);
@@ -134,9 +98,7 @@ HTML = """<!DOCTYPE html>
     outline: none;
     cursor: pointer;
   }
-
   .select-box:focus { border-color: var(--accent); }
-
   .btn {
     border: none;
     border-radius: 10px;
@@ -147,45 +109,29 @@ HTML = """<!DOCTYPE html>
     transition: all 0.2s;
     width: 100%;
   }
-
   .btn-primary {
     background: linear-gradient(135deg, var(--accent), var(--accent2));
     color: #fff;
     box-shadow: 0 4px 15px var(--glow);
   }
-
   .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
   .btn-primary:active { transform: translateY(0); }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-  .status-box {
-    display: none;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    font-size: 0.88rem;
-    line-height: 1.6;
+  .progress-wrap { display: none; margin-top: 10px; }
+  .progress-wrap.active { display: block; }
+  .progress-label {
+    font-size: 0.8rem;
     color: var(--muted);
-    max-height: 180px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
   }
-
-  .status-box.active { display: block; }
-
   .progress-bar {
-    display: none;
-    height: 4px;
+    height: 5px;
     background: var(--border);
     border-radius: 99px;
     overflow: hidden;
-    margin-top: 8px;
   }
-
-  .progress-bar.active { display: block; }
-
   .progress-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--accent), var(--accent2));
@@ -193,121 +139,92 @@ HTML = """<!DOCTYPE html>
     width: 0%;
     transition: width 0.4s ease;
   }
-
-  .badge {
-    display: inline-block;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 2px 8px;
+  .status-box {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--muted);
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-top: 10px;
+    font-family: monospace;
   }
-
-  .badge-success { background: rgba(34, 197, 94, 0.15); color: var(--success); }
-  .badge-error { background: rgba(239, 68, 68, 0.15); color: var(--error); }
-  .badge-warn { background: rgba(245, 158, 11, 0.15); color: var(--warn); }
-
-  .support-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 16px;
-  }
-
+  .status-box.active { display: block; }
+  .support-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
   .chip {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 99px;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     color: var(--muted);
     padding: 4px 12px;
   }
-
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 16px 0;
-  }
-
   .section-label {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin-bottom: 10px;
   }
-
-  .history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 240px;
-    overflow-y: auto;
-  }
-
+  .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
   .history-item {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 14px;
-    font-size: 0.83rem;
+    font-size: 0.82rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 10px;
   }
-
-  .history-item .filename {
-    color: var(--text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-  }
-
-  footer {
-    color: var(--muted);
-    font-size: 0.78rem;
-    margin-top: 24px;
-    text-align: center;
-  }
+  .history-item .fname { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .empty-state { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 16px 0; }
+  footer { color: var(--muted); font-size: 0.76rem; margin-top: 24px; text-align: center; line-height: 1.8; }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="logo">Insta<span>Down</span></div>
-  <div class="subtitle">Termux Video Downloader &bull; localhost:6969</div>
+  <div class="logo">⚡ Spark<span>Downloader</span></div>
+  <div class="subtitle">Social Media Downloader &bull; localhost:6969</div>
 </div>
 
 <div class="card">
   <div class="input-group">
     <input class="url-input" id="urlInput" type="url"
-      placeholder="https://www.instagram.com/reel/... বা যেকোনো URL">
+      placeholder="Paste URL — Instagram, YouTube, TikTok, Facebook...">
 
     <div class="options-row">
+      <select class="select-box" id="typeSelect" onchange="onTypeChange()">
+        <option value="video">Video (MP4)</option>
+        <option value="audio">Audio Only (MP3)</option>
+      </select>
       <select class="select-box" id="qualitySelect">
         <option value="best">Best Quality</option>
-        <option value="bestvideo+bestaudio">Video + Audio (best)</option>
-        <option value="bestaudio">Audio Only (mp3)</option>
-        <option value="worst">Smallest Size</option>
-      </select>
-      <select class="select-box" id="formatSelect">
-        <option value="mp4">MP4</option>
-        <option value="mkv">MKV</option>
-        <option value="mp3">MP3</option>
-        <option value="webm">WebM</option>
+        <option value="good">720p</option>
+        <option value="low">480p / Smallest</option>
       </select>
     </div>
 
     <button class="btn btn-primary" id="dlBtn" onclick="startDownload()">
-      ⬇ Download
+      ⬇&nbsp; Download
     </button>
   </div>
 
-  <div class="progress-bar" id="progressBar">
-    <div class="progress-fill" id="progressFill"></div>
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label">
+      <span id="progressText">Downloading...</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
   </div>
-
   <div class="status-box" id="statusBox"></div>
 
   <div class="support-chips">
@@ -315,106 +232,108 @@ HTML = """<!DOCTYPE html>
     <span class="chip">▶ YouTube</span>
     <span class="chip">🎵 TikTok</span>
     <span class="chip">📘 Facebook</span>
-    <span class="chip">🐦 Twitter/X</span>
-    <span class="chip">+ আরো অনেক</span>
+    <span class="chip">🐦 Twitter / X</span>
+    <span class="chip">+ more</span>
   </div>
 </div>
 
 <div class="card">
   <div class="section-label">📁 Downloaded Files</div>
   <div class="history-list" id="historyList">
-    <div style="color: var(--muted); font-size: 0.85rem; text-align: center; padding: 12px 0;">
-      এখনো কোনো ফাইল ডাউনলোড হয়নি
-    </div>
+    <div class="empty-state">No files yet</div>
   </div>
 </div>
 
 <footer>
-  Files save হচ্ছে: ~/storage/downloads/InstaDown/<br>
-  Powered by yt-dlp &bull; Made for Termux
+  Saved to: ~/storage/downloads/SparkDownloader/<br>
+  Powered by yt-dlp &bull; SparkDownloader v1.0
 </footer>
 
 <script>
 let pollInterval = null;
 
-function log(msg, type='info') {
+function onTypeChange() {
+  // nothing needed for now — backend handles it
+}
+
+function log(msg, color) {
   const box = document.getElementById('statusBox');
   box.classList.add('active');
-  const colors = { info: '#6b6b8a', success: '#22c55e', error: '#ef4444', warn: '#f59e0b' };
-  const color = colors[type] || colors.info;
-  box.innerHTML += `<span style="color:${color}">${msg}</span>\n`;
+  box.innerHTML += `<span style="color:${color||'#6b6b8a'}">${msg}</span>\n`;
   box.scrollTop = box.scrollHeight;
 }
 
-function setProgress(pct) {
-  document.getElementById('progressBar').classList.add('active');
+function setProgress(pct, label) {
+  document.getElementById('progressWrap').classList.add('active');
   document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  if (label) document.getElementById('progressText').textContent = label;
 }
 
 function resetUI() {
-  document.getElementById('progressBar').classList.remove('active');
+  document.getElementById('progressWrap').classList.remove('active');
   document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressPct').textContent = '0%';
+  document.getElementById('progressText').textContent = 'Downloading...';
   document.getElementById('statusBox').innerHTML = '';
   document.getElementById('statusBox').classList.remove('active');
 }
 
 async function startDownload() {
   const url = document.getElementById('urlInput').value.trim();
-  if (!url) { alert('URL দাও আগে!'); return; }
+  if (!url) { alert('Please paste a URL first!'); return; }
 
+  const type = document.getElementById('typeSelect').value;
   const quality = document.getElementById('qualitySelect').value;
-  const format = document.getElementById('formatSelect').value;
 
   resetUI();
   document.getElementById('dlBtn').disabled = true;
-  log('⏳ Download শুরু হচ্ছে...', 'warn');
-  setProgress(10);
+  log('Starting download...', '#f59e0b');
+  setProgress(5, 'Connecting...');
 
   try {
     const resp = await fetch('/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, quality, format })
+      body: JSON.stringify({ url, type, quality })
     });
     const data = await resp.json();
 
     if (data.id) {
-      log('🔄 Processing... ID: ' + data.id, 'info');
       pollStatus(data.id);
     } else {
-      log('❌ Error: ' + (data.error || 'Unknown'), 'error');
+      log('Error: ' + (data.error || 'Unknown error'), '#ef4444');
       document.getElementById('dlBtn').disabled = false;
     }
   } catch(e) {
-    log('❌ Request failed: ' + e.message, 'error');
+    log('Request failed: ' + e.message, '#ef4444');
     document.getElementById('dlBtn').disabled = false;
   }
 }
 
 function pollStatus(id) {
-  let dots = 0;
   pollInterval = setInterval(async () => {
     try {
       const resp = await fetch('/status/' + id);
       const data = await resp.json();
 
-      if (data.progress) setProgress(data.progress);
-      if (data.log) log(data.log, 'info');
+      if (data.progress) setProgress(data.progress, data.stage || 'Downloading...');
+      if (data.log) log(data.log, '#6b6b8a');
 
       if (data.status === 'done') {
         clearInterval(pollInterval);
-        setProgress(100);
-        log('✅ Download সম্পন্ন! ফাইল: ' + data.filename, 'success');
+        setProgress(100, 'Complete!');
+        log('✅ Done! File: ' + data.filename, '#22c55e');
         document.getElementById('dlBtn').disabled = false;
         document.getElementById('urlInput').value = '';
         loadHistory();
       } else if (data.status === 'error') {
         clearInterval(pollInterval);
-        log('❌ Error: ' + data.error, 'error');
+        log('❌ ' + data.error, '#ef4444');
         document.getElementById('dlBtn').disabled = false;
       }
     } catch(e) {}
-  }, 1500);
+  }, 1200);
 }
 
 async function loadHistory() {
@@ -422,78 +341,100 @@ async function loadHistory() {
     const resp = await fetch('/files');
     const data = await resp.json();
     const list = document.getElementById('historyList');
-
     if (!data.files || data.files.length === 0) {
-      list.innerHTML = '<div style="color: var(--muted); font-size: 0.85rem; text-align: center; padding: 12px 0;">কোনো ফাইল নেই</div>';
+      list.innerHTML = '<div class="empty-state">No files yet</div>';
       return;
     }
-
-    list.innerHTML = data.files.reverse().slice(0, 20).map(f => `
+    list.innerHTML = data.files.slice(0, 25).map(f => `
       <div class="history-item">
-        <span class="filename">📄 ${f.name}</span>
-        <span style="color:var(--muted);font-size:0.78rem;white-space:nowrap">${f.size}</span>
+        <span class="fname">📄 ${f.name}</span>
+        <span style="color:var(--muted);font-size:0.76rem;white-space:nowrap">${f.size}</span>
       </div>
     `).join('');
   } catch(e) {}
 }
 
-// Load history on start
 loadHistory();
 </script>
 </body>
 </html>"""
 
+
 @app.route("/")
 def index():
     return render_template_string(HTML)
+
 
 @app.route("/download", methods=["POST"])
 def download():
     data = request.json
     url = data.get("url", "").strip()
-    quality = data.get("quality", "best")
-    fmt = data.get("format", "mp4")
+    dl_type = data.get("type", "video")   # "video" or "audio"
+    quality = data.get("quality", "best") # "best", "good", "low"
 
     if not url:
-        return jsonify({"error": "URL দাও"}), 400
+        return jsonify({"error": "No URL provided"}), 400
 
-    import uuid, time
+    import uuid
     dl_id = str(uuid.uuid4())[:8]
     downloads[dl_id] = {
         "status": "running",
-        "progress": 10,
+        "progress": 5,
+        "stage": "Starting...",
         "log": None,
         "filename": None,
         "error": None
     }
 
-    threading.Thread(target=run_download, args=(dl_id, url, quality, fmt), daemon=True).start()
+    threading.Thread(
+        target=run_download,
+        args=(dl_id, url, dl_type, quality),
+        daemon=True
+    ).start()
+
     return jsonify({"id": dl_id})
 
-def run_download(dl_id, url, quality, fmt):
+
+def run_download(dl_id, url, dl_type, quality):
     try:
-        output_template = os.path.join(DOWNLOAD_DIR, "%(title).60s.%(ext)s")
-        cmd = ["yt-dlp", "--no-playlist", "-o", output_template]
+        output_template = os.path.join(DOWNLOAD_DIR, "%(title).80s.%(ext)s")
 
-        if fmt == "mp3":
-            cmd += ["-x", "--audio-format", "mp3"]
-        else:
-            if quality == "bestaudio":
-                cmd += ["-x", "--audio-format", "mp3"]
-            elif quality == "best":
-                cmd += ["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"]
-            else:
-                cmd += ["-f", quality]
-            cmd += ["--merge-output-format", fmt]
-
-        cmd += [
-            "--progress",
-            "--no-warnings",
+        cmd = [
+            "yt-dlp",
+            "--no-playlist",
+            "-o", output_template,
             "--newline",
-            url
+            "--no-warnings",
+            "--ffmpeg-location", "/data/data/com.termux/files/usr/bin/ffmpeg",
         ]
 
-        downloads[dl_id]["log"] = "yt-dlp চালু হচ্ছে..."
+        if dl_type == "audio":
+            # Audio only — single file, no merge needed
+            cmd += [
+                "-x",
+                "--audio-format", "mp3",
+                "--audio-quality", "0",
+            ]
+        else:
+            # Video — download best mp4 that already has audio, avoid separate streams when possible
+            if quality == "best":
+                fmt = "bestvideo[ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+            elif quality == "good":
+                fmt = "bestvideo[height<=720][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]"
+            else:
+                fmt = "bestvideo[height<=480][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/worst[ext=mp4]/worst"
+
+            cmd += [
+                "-f", fmt,
+                "--merge-output-format", "mp4",
+                "--postprocessor-args", "ffmpeg:-c:v copy -c:a aac",
+            ]
+
+        cmd.append(url)
+
+        downloads[dl_id]["log"] = "yt-dlp started"
+        downloads[dl_id]["stage"] = "Fetching info..."
+
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -503,65 +444,73 @@ def run_download(dl_id, url, quality, fmt):
         )
 
         last_filename = None
+
         for line in process.stdout:
             line = line.strip()
             if not line:
                 continue
 
-            # Parse progress
             if "[download]" in line:
-                if "%" in line:
-                    try:
-                        pct_str = line.split("%")[0].split()[-1]
-                        pct = float(pct_str.replace(",", "."))
-                        downloads[dl_id]["progress"] = min(int(pct), 95)
-                        downloads[dl_id]["log"] = line
-                    except:
-                        downloads[dl_id]["log"] = line
-                elif "Destination:" in line:
+                if "Destination:" in line:
                     last_filename = line.split("Destination:")[-1].strip()
-                    downloads[dl_id]["log"] = "📥 " + os.path.basename(last_filename)
-                else:
-                    downloads[dl_id]["log"] = line
-
-            elif "[Merger]" in line or "[ffmpeg]" in line:
-                downloads[dl_id]["log"] = "🔧 Processing..."
+                    downloads[dl_id]["stage"] = "Downloading..."
+                    downloads[dl_id]["log"] = "Saving: " + os.path.basename(last_filename)
+                elif "%" in line:
+                    try:
+                        pct_str = line.split("%")[0].split()[-1].replace(",", ".")
+                        pct = float(pct_str)
+                        downloads[dl_id]["progress"] = max(5, min(int(pct * 0.85), 88))
+                        downloads[dl_id]["stage"] = "Downloading..."
+                    except:
+                        pass
+                elif "has already been downloaded" in line:
+                    downloads[dl_id]["log"] = "Already downloaded"
+            elif "[Merger]" in line or "[ffmpeg]" in line or "Merging" in line:
+                downloads[dl_id]["stage"] = "Merging video & audio..."
+                downloads[dl_id]["progress"] = 92
+                downloads[dl_id]["log"] = "Merging..."
+            elif "[ExtractAudio]" in line or "Destination" in line:
+                downloads[dl_id]["stage"] = "Converting..."
                 downloads[dl_id]["progress"] = 90
-
-            elif "has already been downloaded" in line:
-                downloads[dl_id]["log"] = "⚠️ Already downloaded"
 
         process.wait()
 
         if process.returncode == 0:
-            # Find the downloaded file
+            # Find newest file in output dir
             filename = None
-            if last_filename and os.path.exists(last_filename):
-                filename = os.path.basename(last_filename)
-            else:
+            if last_filename:
+                # yt-dlp may change extension after merge/convert
+                stem = Path(last_filename).stem
+                candidates = list(Path(DOWNLOAD_DIR).glob(f"{stem}.*"))
+                if candidates:
+                    filename = max(candidates, key=os.path.getmtime).name
+
+            if not filename:
                 files = sorted(Path(DOWNLOAD_DIR).iterdir(), key=os.path.getmtime, reverse=True)
                 if files:
                     filename = files[0].name
 
             downloads[dl_id]["status"] = "done"
             downloads[dl_id]["progress"] = 100
-            downloads[dl_id]["filename"] = filename or "file"
+            downloads[dl_id]["filename"] = filename or "downloaded file"
         else:
             downloads[dl_id]["status"] = "error"
-            downloads[dl_id]["error"] = "yt-dlp failed. URL check করো।"
+            downloads[dl_id]["error"] = "yt-dlp failed. Check the URL and try again."
 
     except FileNotFoundError:
         downloads[dl_id]["status"] = "error"
-        downloads[dl_id]["error"] = "yt-dlp পাওয়া গেলো না! `pip install yt-dlp` চালাও।"
+        downloads[dl_id]["error"] = "yt-dlp not found. Run: pip install yt-dlp"
     except Exception as e:
         downloads[dl_id]["status"] = "error"
         downloads[dl_id]["error"] = str(e)
+
 
 @app.route("/status/<dl_id>")
 def status(dl_id):
     if dl_id not in downloads:
         return jsonify({"status": "error", "error": "Not found"}), 404
     return jsonify(downloads[dl_id])
+
 
 @app.route("/files")
 def list_files():
@@ -570,16 +519,17 @@ def list_files():
         for f in sorted(Path(DOWNLOAD_DIR).iterdir(), key=os.path.getmtime, reverse=True):
             if f.is_file():
                 size = f.stat().st_size
-                if size >= 1024**2:
-                    size_str = f"{size/1024**2:.1f} MB"
+                if size >= 1024 ** 2:
+                    size_str = f"{size / 1024 ** 2:.1f} MB"
                 elif size >= 1024:
-                    size_str = f"{size/1024:.1f} KB"
+                    size_str = f"{size / 1024:.1f} KB"
                 else:
                     size_str = f"{size} B"
                 files.append({"name": f.name, "size": size_str})
         return jsonify({"files": files})
     except Exception as e:
         return jsonify({"files": [], "error": str(e)})
+
 
 def check_deps():
     missing = []
@@ -590,20 +540,21 @@ def check_deps():
             missing.append(pkg.replace("_", "-"))
     return missing
 
+
 if __name__ == "__main__":
-    print("\n" + "="*45)
-    print("  🔮 InstaDown - Termux Downloader")
-    print("="*45)
+    print("\n" + "=" * 45)
+    print("  ⚡ SparkDownloader v1.0")
+    print("=" * 45)
 
     missing = check_deps()
     if missing:
-        print(f"\n⚠️  Missing packages: {', '.join(missing)}")
-        print(f"   Run: pip install {' '.join(missing)}")
+        print(f"\n  Missing packages: {', '.join(missing)}")
+        print(f"  Run: pip install {' '.join(missing)}")
         sys.exit(1)
 
-    print(f"\n📁 Save folder: {DOWNLOAD_DIR}")
-    print(f"🌐 Open browser: http://localhost:6969")
-    print(f"\n   Ctrl+C দিয়ে বন্ধ করো\n")
-    print("="*45 + "\n")
+    print(f"\n  Save folder : {DOWNLOAD_DIR}")
+    print(f"  Open browser: http://localhost:6969")
+    print(f"\n  Press Ctrl+C to stop\n")
+    print("=" * 45 + "\n")
 
     app.run(host="0.0.0.0", port=6969, debug=False)
